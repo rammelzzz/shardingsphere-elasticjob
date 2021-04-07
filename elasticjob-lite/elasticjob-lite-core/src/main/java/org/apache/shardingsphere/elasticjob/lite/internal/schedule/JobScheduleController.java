@@ -35,7 +35,8 @@ import org.quartz.TriggerKey;
  */
 @RequiredArgsConstructor
 public final class JobScheduleController {
-    
+
+    // quartz api
     private final Scheduler scheduler;
     
     private final JobDetail jobDetail;
@@ -43,7 +44,7 @@ public final class JobScheduleController {
     private final String triggerIdentity;
     
     /**
-     * Schedule job.
+     * 调度任务
      * 
      * @param cron CRON expression
      */

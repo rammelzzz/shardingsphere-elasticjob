@@ -108,6 +108,7 @@ public final class ShardingService {
      * </p>
      */
     public void shardingIfNecessary() {
+        // 获取集群服务集合
         List<JobInstance> availableJobInstances = instanceService.getAvailableJobInstances();
         if (!isNeedSharding() || availableJobInstances.isEmpty()) {
             return;
@@ -116,13 +117,27 @@ public final class ShardingService {
             blockUntilShardingCompleted();
             return;
         }
+
+        /* ********************   Leader执行sharding的过程  ****************/
+
+        // 等待上一次分片的任务执行完毕
         waitingOtherShardingItemCompleted();
         JobConfiguration jobConfig = configService.load(false);
+
+
+        // 获取总分片数
         int shardingTotalCount = jobConfig.getShardingTotalCount();
         log.debug("Job '{}' sharding begin.", jobName);
         jobNodeStorage.fillEphemeralJobNode(ShardingNode.PROCESSING, "");
+
+        // 重置分片信息
+        // 创建了一堆/jobName/sharding/${shardingNumber}节点，节点数目由shardingTotalCount决定
         resetShardingInfo(shardingTotalCount);
+
+        // 获取Job分片策略
         JobShardingStrategy jobShardingStrategy = JobShardingStrategyFactory.getStrategy(jobConfig.getJobShardingStrategyType());
+
+        // 将分片信息放到事务中执行，注册到注册中心
         jobNodeStorage.executeInTransaction(new PersistShardingInfoTransactionExecutionCallback(jobShardingStrategy.sharding(availableJobInstances, jobName, shardingTotalCount)));
         log.debug("Job '{}' sharding complete.", jobName);
     }
@@ -143,9 +158,14 @@ public final class ShardingService {
     
     private void resetShardingInfo(final int shardingTotalCount) {
         for (int i = 0; i < shardingTotalCount; i++) {
+            // 如果某个分片存在服务节点，则移除
             jobNodeStorage.removeJobNodeIfExisted(ShardingNode.getInstanceNode(i));
+
             jobNodeStorage.createJobNodeIfNeeded(ShardingNode.ROOT + "/" + i);
         }
+
+        // 查看实际上的创建成功的分片数目
+        // 即查看/jobName/sharding/ 下的children数目
         int actualShardingTotalCount = jobNodeStorage.getJobNodeChildrenKeys(ShardingNode.ROOT).size();
         if (actualShardingTotalCount > shardingTotalCount) {
             for (int i = shardingTotalCount; i < actualShardingTotalCount; i++) {
@@ -184,6 +204,7 @@ public final class ShardingService {
         if (JobRegistry.getInstance().isShutdown(jobName) || !serverService.isAvailableServer(JobRegistry.getInstance().getJobInstance(jobName).getServerIp())) {
             return Collections.emptyList();
         }
+        // 这里获取到的实际上是本机对应的全部shardingItems
         return getShardingItems(JobRegistry.getInstance().getJobInstance(jobName).getJobInstanceId());
     }
     
@@ -213,10 +234,13 @@ public final class ShardingService {
             List<CuratorOp> result = new LinkedList<>();
             for (Entry<JobInstance, List<Integer>> entry : shardingResults.entrySet()) {
                 for (int shardingItem : entry.getValue()) {
+                    // 将/jobName/sharding/${shardingNumber}/instance 的值置为分到分片的服务节点的instanceId
                     result.add(transactionOp.create().forPath(jobNodePath.getFullPath(ShardingNode.getInstanceNode(shardingItem)), entry.getKey().getJobInstanceId().getBytes()));
                 }
             }
+            // 移除需要分片的/jobName/leader/sharding/necessary
             result.add(transactionOp.delete().forPath(jobNodePath.getFullPath(ShardingNode.NECESSARY)));
+            // 移除/jobName/leader/sharding/processing 节点，意为分片结束
             result.add(transactionOp.delete().forPath(jobNodePath.getFullPath(ShardingNode.PROCESSING)));
             return result;
         }

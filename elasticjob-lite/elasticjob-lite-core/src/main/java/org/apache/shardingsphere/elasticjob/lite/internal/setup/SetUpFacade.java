@@ -72,10 +72,16 @@ public final class SetUpFacade {
      * @param enabled enable job on startup
      */
     public void registerStartUpInfo(final boolean enabled) {
+        // 启动监听器/针对注册中心
         listenerManager.startAllListeners();
+        // 当前节点尝试竞选Leader
         leaderService.electLeader();
+        // 获取当前在线的服务节点
         serverService.persistOnline(enabled);
+        // 注册当前节点
         instanceService.persistOnline();
+
+        // 当本地状态和注册中心状态不一致时，设置需要重新同步/重新分片的flag
         if (!reconcileService.isRunning()) {
             reconcileService.startAsync();
         }

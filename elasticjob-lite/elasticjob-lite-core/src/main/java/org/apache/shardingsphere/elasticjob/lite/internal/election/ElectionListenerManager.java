@@ -57,7 +57,8 @@ public final class ElectionListenerManager extends AbstractListenerManager {
         addDataListener(new LeaderElectionJobListener());
         addDataListener(new LeaderAbdicationJobListener());
     }
-    
+
+    // 作为follower时，监听leader退位消息
     class LeaderElectionJobListener extends AbstractJobListener {
         
         @Override
@@ -84,7 +85,8 @@ public final class ElectionListenerManager extends AbstractListenerManager {
             return serverNode.isLocalServerPath(path) && !ServerStatus.DISABLED.name().equals(data);
         }
     }
-    
+
+    // 作为Leader退位
     class LeaderAbdicationJobListener extends AbstractJobListener {
         
         @Override

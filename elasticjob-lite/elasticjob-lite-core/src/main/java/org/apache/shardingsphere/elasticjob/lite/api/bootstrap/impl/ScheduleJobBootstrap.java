@@ -27,6 +27,9 @@ import org.apache.shardingsphere.elasticjob.reg.base.CoordinatorRegistryCenter;
 
 /**
  * Schedule job bootstrap.
+ *
+ * 这里是每个Job初始化的起点，需要注意的是，在ElasticJob中每个Job都是一个独立的单元。
+ * 因此每个Job都需要通过Bootstrap进行一次初始化
  */
 public final class ScheduleJobBootstrap implements JobBootstrap {
     

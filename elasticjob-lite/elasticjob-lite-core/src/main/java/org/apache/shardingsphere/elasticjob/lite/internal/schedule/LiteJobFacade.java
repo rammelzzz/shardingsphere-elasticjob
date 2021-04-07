@@ -111,6 +111,7 @@ public final class LiteJobFacade implements JobFacade {
             }
         }
         shardingService.shardingIfNecessary();
+        // 这里获取到的是本机对应的全部shardingItems
         List<Integer> shardingItems = shardingService.getLocalShardingItems();
         if (isFailover) {
             shardingItems.removeAll(failoverService.getLocalTakeOffItems());

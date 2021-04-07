@@ -71,19 +71,24 @@ public final class ElasticJobExecutor {
     }
     
     /**
-     * Execute job.
+     * 执行任务的入口
      */
     public void execute() {
         JobConfiguration jobConfig = jobFacade.loadJobConfiguration(true);
+        // 如果需要的话重新读取配置
         executorContext.reloadIfNecessary(jobConfig);
         JobErrorHandler jobErrorHandler = executorContext.get(JobErrorHandler.class);
         try {
+            // 查看本地时间是否与注册中心时间差距过大
             jobFacade.checkJobExecutionEnvironment();
         } catch (final JobExecutionEnvironmentException cause) {
             jobErrorHandler.handleException(jobConfig.getJobName(), cause);
         }
+        // 获取分片上下文
         ShardingContexts shardingContexts = jobFacade.getShardingContexts();
+        // tracing
         jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_STAGING, String.format("Job '%s' execute begin.", jobConfig.getJobName()));
+        // 如果分片还在执行，则设置misfire标 -> shardingItem是什么?
         if (jobFacade.misfireIfRunning(shardingContexts.getShardingItemParameters().keySet())) {
             jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_FINISHED, String.format(
                     "Previous job '%s' - shardingItems '%s' is still running, misfired job will start after previous job completed.", jobConfig.getJobName(),
@@ -102,6 +107,7 @@ public final class ElasticJobExecutor {
             jobFacade.clearMisfire(shardingContexts.getShardingItemParameters().keySet());
             execute(jobConfig, shardingContexts, ExecutionSource.MISFIRE);
         }
+        // 如果开启了故障转移，则由leader负责执行其他失败分片的任务
         jobFacade.failoverIfNecessary();
         try {
             jobFacade.afterJobExecuted(shardingContexts);
@@ -169,6 +175,7 @@ public final class ElasticJobExecutor {
         log.trace("Job '{}' executing, item is: '{}'.", jobConfig.getJobName(), item);
         JobExecutionEvent completeEvent;
         try {
+            // 执行任务
             jobItemExecutor.process(elasticJob, jobConfig, jobFacade, shardingContexts.createShardingContext(item));
             completeEvent = startEvent.executionSuccess();
             log.trace("Job '{}' executed, item is: '{}'.", jobConfig.getJobName(), item);

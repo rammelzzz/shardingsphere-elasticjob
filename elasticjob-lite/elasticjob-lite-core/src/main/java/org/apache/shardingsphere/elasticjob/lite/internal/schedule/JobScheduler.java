@@ -135,6 +135,7 @@ public final class JobScheduler {
     }
     
     private JobScheduleController createJobScheduleController() {
+        // 使用quartz api构造controller
         JobScheduleController result = new JobScheduleController(createScheduler(), createJobDetail(), getJobConfig().getJobName());
         JobRegistry.getInstance().registerJob(getJobConfig().getJobName(), result);
         registerStartUpInfo();
@@ -167,11 +168,15 @@ public final class JobScheduler {
     
     private JobDetail createJobDetail() {
         JobDetail result = JobBuilder.newJob(LiteJob.class).withIdentity(getJobConfig().getJobName()).build();
+        // 注意这里将elasticjob中的executor注入到了JobDetail中
+        // 这里是利用quartz的api，当Job的implementation中有某个属性的setter方法并且
+        // 在jobDataMap中有该属性的key-value值时，会自动调用该Job的setter方法注入
         result.getJobDataMap().put(JOB_EXECUTOR_DATA_MAP_KEY, jobExecutor);
         return result;
     }
     
     private void registerStartUpInfo() {
+        // 将当前任务信息添加到本地注册中心
         JobRegistry.getInstance().registerRegistryCenter(jobConfig.getJobName(), regCenter);
         JobRegistry.getInstance().addJobInstance(jobConfig.getJobName(), new JobInstance());
         JobRegistry.getInstance().setCurrentShardingTotalCount(jobConfig.getJobName(), jobConfig.getShardingTotalCount());

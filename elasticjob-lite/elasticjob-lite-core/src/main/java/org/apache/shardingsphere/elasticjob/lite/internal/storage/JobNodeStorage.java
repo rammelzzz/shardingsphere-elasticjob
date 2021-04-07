@@ -114,7 +114,11 @@ public final class JobNodeStorage {
      * @param node node
      */
     public void createJobNodeIfNeeded(final String node) {
+        // node = /sharding/${shardingNumber}
+        // /jobName 必须存在，即这个任务还没有被shutdown
+        // jobNode不存在，即/jobName/sharding/${shardingNumber}
         if (isJobRootNodeExisted() && !isJobNodeExisted(node)) {
+            // 创建 /jobName/sharding/${shardingNumber}
             regCenter.persist(jobNodePath.getFullPath(node), "");
         }
     }
@@ -125,7 +129,11 @@ public final class JobNodeStorage {
      * @param node node
      */
     public void removeJobNodeIfExisted(final String node) {
+        // node = sharding/${shardingNumber}/instance
+
+        // 判断/jobName/sharding/${shardingNumber}/instance是否存在
         if (isJobNodeExisted(node)) {
+            // 如果存在则删除
             regCenter.remove(jobNodePath.getFullPath(node));
         }
     }
